@@ -26,7 +26,7 @@ With the right setup, you're not just chatting with Claude - you're delegating t
 - 💬 **Text**: Ask questions, give instructions, have conversations
 - 🎤 **Voice**: Speak naturally - transcribed via OpenAI and processed by Claude
 - 📸 **Photos**: Send screenshots, documents, or anything visual for analysis
-- 📄 **Documents**: PDFs and text files are extracted and readable by Claude
+- 📄 **Documents**: PDFs, text files, and archives (ZIP, TAR) are extracted and analyzed
 - 🔄 **Session persistence**: Conversations continue across messages
 - 📨 **Message queuing**: Send multiple messages while Claude works - they queue up automatically. Prefix with `!` or use `/stop` to interrupt and send immediately
 - 🧠 **Extended thinking**: Trigger Claude's reasoning by using words like "think" or "reason" - you'll see its thought process as it works (configurable via `THINKING_TRIGGER_KEYWORDS`)
@@ -153,6 +153,16 @@ The bot will start automatically on login and restart if it crashes.
 ```bash
 tail -f /tmp/claude-telegram-bot-ts.log   # stdout
 tail -f /tmp/claude-telegram-bot-ts.err   # stderr
+```
+
+**Shell aliases:** If running as a service, these aliases make it easy to manage the bot (add to `~/.zshrc` or `~/.bashrc`):
+
+```bash
+alias cbot='launchctl list | grep com.claude-telegram-ts'
+alias cbot-stop='launchctl bootout gui/$(id -u)/com.claude-telegram-ts 2>/dev/null && echo "Stopped"'
+alias cbot-start='launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.claude-telegram-ts.plist 2>/dev/null && echo "Started"'
+alias cbot-restart='launchctl kickstart -k gui/$(id -u)/com.claude-telegram-ts && echo "Restarted"'
+alias cbot-logs='tail -f /tmp/claude-telegram-bot-ts.log'
 ```
 
 ## Development
