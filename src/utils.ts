@@ -195,8 +195,8 @@ export function startTypingIndicator(ctx: Context): TypingController {
     while (running) {
       try {
         await ctx.replyWithChatAction("typing");
-      } catch {
-        // Ignore errors
+      } catch (error) {
+        console.debug("Typing indicator failed:", error);
       }
       await Bun.sleep(4000);
     }

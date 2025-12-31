@@ -78,8 +78,8 @@ export async function handleText(ctx: Context): Promise<void> {
     for (const toolMsg of state.toolMessages) {
       try {
         await ctx.api.deleteMessage(toolMsg.chat.id, toolMsg.message_id);
-      } catch {
-        // Ignore
+      } catch (error) {
+        console.debug("Failed to delete tool message:", error);
       }
     }
 

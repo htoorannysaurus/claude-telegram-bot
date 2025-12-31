@@ -119,8 +119,8 @@ export async function handleVoice(ctx: Context): Promise<void> {
     if (voicePath) {
       try {
         unlinkSync(voicePath);
-      } catch {
-        // Ignore cleanup errors
+      } catch (error) {
+        console.debug("Failed to delete voice file:", error);
       }
     }
   }

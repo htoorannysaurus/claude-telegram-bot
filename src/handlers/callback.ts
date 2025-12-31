@@ -76,8 +76,8 @@ export async function handleCallback(ctx: Context): Promise<void> {
   // 5. Update the message to show selection
   try {
     await ctx.editMessageText(`✓ ${selectedOption}`);
-  } catch {
-    // Ignore edit errors
+  } catch (error) {
+    console.debug("Failed to edit callback message:", error);
   }
 
   // 6. Answer the callback
@@ -86,8 +86,8 @@ export async function handleCallback(ctx: Context): Promise<void> {
   // 7. Delete request file
   try {
     unlinkSync(requestFile);
-  } catch {
-    // Ignore
+  } catch (error) {
+    console.debug("Failed to delete request file:", error);
   }
 
   // 8. Send the choice to Claude as a message
@@ -134,8 +134,8 @@ export async function handleCallback(ctx: Context): Promise<void> {
     for (const toolMsg of state.toolMessages) {
       try {
         await ctx.api.deleteMessage(toolMsg.chat.id, toolMsg.message_id);
-      } catch {
-        // Ignore
+      } catch (error) {
+        console.debug("Failed to delete tool message:", error);
       }
     }
 
