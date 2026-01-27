@@ -84,7 +84,13 @@ export async function handleText(ctx: Context): Promise<void> {
         ctx
       );
 
-      // 10. Audit log
+      // 10. Check for context warning and send it
+      const contextWarning = session.consumeContextWarning();
+      if (contextWarning) {
+        await statusCallback("context_warning", contextWarning);
+      }
+
+      // 11. Audit log
       await auditLog(userId, username, "TEXT", message, response);
       break; // Success - exit retry loop
     } catch (error) {

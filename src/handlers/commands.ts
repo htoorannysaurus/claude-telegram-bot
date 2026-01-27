@@ -1,7 +1,7 @@
 /**
  * Command handlers for Claude Telegram Bot.
  *
- * /start, /new, /stop, /status, /resume, /restart
+ * /start, /new, /stop, /status, /resume, /restart, /context
  */
 
 import type { Context } from "grammy";
@@ -299,4 +299,60 @@ export async function handleRetry(ctx: Context): Promise<void> {
   } as Context;
 
   await handleText(fakeCtx);
+}
+
+/**
+ * /context - Show context window usage and limits.
+ */
+export async function handleContext(ctx: Context): Promise<void> {
+  const userId = ctx.from?.id;
+
+  if (!isAuthorized(userId, ALLOWED_USERS)) {
+    await ctx.reply("Unauthorized.");
+    return;
+  }
+
+  const lines: string[] = ["📊 <b>Context Window</b>\n"];
+
+  // Model info (Claude Code typically uses Opus)
+  lines.push("🤖 Model: Claude Opus 4");
+  lines.push("📦 Max context: 200,000 tokens\n");
+
+  // Last query usage
+  if (session.lastUsage) {
+    const usage = session.lastUsage;
+    const inputTokens = usage.input_tokens || 0;
+    const outputTokens = usage.output_tokens || 0;
+    const cacheRead = usage.cache_read_input_tokens || 0;
+    const cacheCreation = usage.cache_creation_input_tokens || 0;
+    const totalUsed = inputTokens + outputTokens;
+
+    lines.push("📈 <b>Last Query:</b>");
+    lines.push(`   Input: ${inputTokens.toLocaleString()} tokens`);
+    lines.push(`   Output: ${outputTokens.toLocaleString()} tokens`);
+
+    if (cacheRead > 0) {
+      lines.push(`   Cache read: ${cacheRead.toLocaleString()} tokens`);
+    }
+    if (cacheCreation > 0) {
+      lines.push(`   Cache creation: ${cacheCreation.toLocaleString()} tokens`);
+    }
+
+    lines.push(`   <b>Total: ${totalUsed.toLocaleString()} tokens</b>`);
+
+    // Percentage of max context
+    const percentUsed = ((totalUsed / 200000) * 100).toFixed(1);
+    lines.push(`   (${percentUsed}% of max context)`);
+  } else {
+    lines.push("⚪ No usage data yet");
+  }
+
+  // Session status
+  if (session.isActive) {
+    lines.push(`\n💬 Session: Active (${session.sessionId?.slice(0, 8)}...)`);
+  } else {
+    lines.push("\n💬 Session: None");
+  }
+
+  await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
 }

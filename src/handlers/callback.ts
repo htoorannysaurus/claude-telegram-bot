@@ -126,6 +126,12 @@ export async function handleCallback(ctx: Context): Promise<void> {
       ctx
     );
 
+    // Check for context warning and send it
+    const contextWarning = session.consumeContextWarning();
+    if (contextWarning) {
+      await statusCallback("context_warning", contextWarning);
+    }
+
     await auditLog(userId, username, "CALLBACK", message, response);
   } catch (error) {
     console.error("Error processing callback:", error);
@@ -208,6 +214,12 @@ async function handleResumeCallback(
       chatId,
       ctx
     );
+
+    // Check for context warning and send it
+    const contextWarning = session.consumeContextWarning();
+    if (contextWarning) {
+      await statusCallback("context_warning", contextWarning);
+    }
   } catch (error) {
     console.error("Error getting recap:", error);
     // Don't show error to user - session is still resumed, recap just failed

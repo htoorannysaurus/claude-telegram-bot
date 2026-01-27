@@ -214,6 +214,9 @@ export function createStatusCallback(
             }
           }
         }
+      } else if (statusType === "context_warning") {
+        // Send context usage warning as a separate message
+        await ctx.reply(`⚠️ ${content}`);
       } else if (statusType === "done") {
         // Delete tool messages - text messages stay
         for (const toolMsg of state.toolMessages) {

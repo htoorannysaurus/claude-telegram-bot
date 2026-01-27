@@ -1,0 +1,15 @@
+[Unit]
+Description=Claude Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+User=joehtoo
+WorkingDirectory=/home/joehtoo/claude-telegram-bot
+Environment=PATH=/home/joehtoo/.bun/bin:/home/joehtoo/.nvm/versions/node/v22.16.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/home/joehtoo/.bun/bin/bun run src/index.ts
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

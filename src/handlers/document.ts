@@ -271,6 +271,12 @@ async function processArchive(
       ctx
     );
 
+    // Check for context warning and send it
+    const contextWarning = session.consumeContextWarning();
+    if (contextWarning) {
+      await statusCallback("context_warning", contextWarning);
+    }
+
     await auditLog(
       userId,
       username,
@@ -360,6 +366,12 @@ async function processDocuments(
       chatId,
       ctx
     );
+
+    // Check for context warning and send it
+    const contextWarning = session.consumeContextWarning();
+    if (contextWarning) {
+      await statusCallback("context_warning", contextWarning);
+    }
 
     await auditLog(
       userId,

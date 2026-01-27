@@ -97,6 +97,12 @@ async function processPhotos(
       ctx
     );
 
+    // Check for context warning and send it
+    const contextWarning = session.consumeContextWarning();
+    if (contextWarning) {
+      await statusCallback("context_warning", contextWarning);
+    }
+
     await auditLog(userId, username, "PHOTO", prompt, response);
   } catch (error) {
     await handleProcessingError(ctx, error, state.toolMessages);

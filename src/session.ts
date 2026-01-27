@@ -74,6 +74,10 @@ function getTextFromMessage(msg: SDKMessage): string | null {
 // Maximum number of sessions to keep in history
 const MAX_SESSIONS = 5;
 
+// Context monitoring configuration
+const CONTEXT_WINDOW_SIZE = 200000;
+const CONTEXT_WARNING_THRESHOLD = 80; // Percentage
+
 class ClaudeSession {
   sessionId: string | null = null;
   lastActivity: Date | null = null;
@@ -85,6 +89,14 @@ class ClaudeSession {
   lastUsage: TokenUsage | null = null;
   lastMessage: string | null = null;
   conversationTitle: string | null = null;
+
+  // Context monitoring
+  // Note: input tokens from API are cumulative per turn (full context sent that turn)
+  // We track the LATEST turn's input, not a sum across turns
+  private lastTurnInputTokens = 0;
+  private cumulativeOutputTokens = 0;
+  private contextWarningNotified = false;
+  private pendingContextWarning: string | null = null;
 
   private abortController: AbortController | null = null;
   private isQueryRunning = false;
@@ -98,6 +110,51 @@ class ClaudeSession {
 
   get isRunning(): boolean {
     return this.isQueryRunning || this._isProcessing;
+  }
+
+  /**
+   * Get current context usage percentage.
+   * Uses last turn's input tokens (already cumulative) + output tokens accumulated this session.
+   */
+  get contextUsagePercent(): number {
+    const totalTokens = this.lastTurnInputTokens + this.cumulativeOutputTokens;
+    return Math.min(100, Math.round((totalTokens / CONTEXT_WINDOW_SIZE) * 100));
+  }
+
+  /**
+   * Check context usage and queue warning if approaching threshold.
+   * The warning will be sent via statusCallback after the response completes.
+   */
+  private checkContextUsage(): void {
+    const percent = this.contextUsagePercent;
+
+    if (percent >= CONTEXT_WARNING_THRESHOLD && !this.contextWarningNotified) {
+      this.contextWarningNotified = true;
+      const totalTokens = this.lastTurnInputTokens + this.cumulativeOutputTokens;
+      this.pendingContextWarning = `Context at ${percent}% (~${totalTokens.toLocaleString()} tokens). Consider starting a new session with /kill.`;
+      console.log(
+        `CONTEXT WARNING: ${percent}% used (${totalTokens.toLocaleString()} tokens)`
+      );
+    }
+  }
+
+  /**
+   * Get and clear any pending context warning.
+   */
+  consumeContextWarning(): string | null {
+    const warning = this.pendingContextWarning;
+    this.pendingContextWarning = null;
+    return warning;
+  }
+
+  /**
+   * Reset context tracking (called when session is cleared).
+   */
+  private resetContextTracking(): void {
+    this.lastTurnInputTokens = 0;
+    this.cumulativeOutputTokens = 0;
+    this.contextWarningNotified = false;
+    this.pendingContextWarning = null;
   }
 
   /**
@@ -207,7 +264,7 @@ class ClaudeSession {
 
     // Build SDK V1 options - supports all features
     const options: Options = {
-      model: "claude-sonnet-4-5",
+      model: "claude-opus-4-5",
       cwd: WORKING_DIR,
       settingSources: ["user", "project"],
       permissionMode: "bypassPermissions",
@@ -413,11 +470,25 @@ class ClaudeSession {
           if ("usage" in event && event.usage) {
             this.lastUsage = event.usage as TokenUsage;
             const u = this.lastUsage;
+
+            // Track context usage for monitoring
+            // Input tokens are CUMULATIVE per turn (full context sent), so we REPLACE not add
+            // Output tokens accumulate across the session
+            const inputForTurn =
+              u.input_tokens +
+              (u.cache_read_input_tokens || 0) +
+              (u.cache_creation_input_tokens || 0);
+            this.lastTurnInputTokens = inputForTurn; // Replace with latest
+            this.cumulativeOutputTokens += u.output_tokens;
+
             console.log(
               `Usage: in=${u.input_tokens} out=${u.output_tokens} cache_read=${
                 u.cache_read_input_tokens || 0
-              } cache_create=${u.cache_creation_input_tokens || 0}`
+              } cache_create=${u.cache_creation_input_tokens || 0} | context=${this.contextUsagePercent}%`
             );
+
+            // Check if approaching context limit
+            this.checkContextUsage();
           }
         }
       }
@@ -473,6 +544,7 @@ class ClaudeSession {
     this.sessionId = null;
     this.lastActivity = null;
     this.conversationTitle = null;
+    this.resetContextTracking();
     console.log("Session cleared");
   }
 
