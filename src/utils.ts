@@ -5,6 +5,7 @@
  */
 
 import OpenAI from "openai";
+import { SpeechClient } from "@google-cloud/speech";
 import type { Chat } from "grammy/types";
 import type { Context } from "grammy";
 import type { AuditEvent } from "./types";
@@ -14,13 +15,25 @@ import {
   OPENAI_API_KEY,
   TRANSCRIPTION_PROMPT,
   TRANSCRIPTION_AVAILABLE,
+  TRANSCRIPTION_PROVIDER,
+  GOOGLE_APPLICATION_CREDENTIALS,
 } from "./config";
 
 // ============== OpenAI Client ==============
 
 let openaiClient: OpenAI | null = null;
-if (OPENAI_API_KEY && TRANSCRIPTION_AVAILABLE) {
+if (OPENAI_API_KEY) {
   openaiClient = new OpenAI({ apiKey: OPENAI_API_KEY });
+}
+
+// ============== Google Speech Client ==============
+
+let googleSpeechClient: SpeechClient | null = null;
+if (GOOGLE_APPLICATION_CREDENTIALS) {
+  googleSpeechClient = new SpeechClient({
+    keyFilename: GOOGLE_APPLICATION_CREDENTIALS,
+  });
+  console.log("Google Speech-to-Text client initialized");
 }
 
 // ============== Audit Logging ==============
@@ -147,9 +160,46 @@ export async function auditLogRateLimit(
 
 // ============== Voice Transcription ==============
 
-export async function transcribeVoice(
-  filePath: string
-): Promise<string | null> {
+/**
+ * Transcribe audio using Google Cloud Speech-to-Text.
+ * Uses OGG_OPUS encoding at 48kHz which works with Telegram voice messages.
+ */
+async function transcribeWithGoogle(filePath: string): Promise<string | null> {
+  if (!googleSpeechClient) {
+    console.warn("Google Speech client not available for transcription");
+    return null;
+  }
+
+  try {
+    const audioContent = await Bun.file(filePath).arrayBuffer();
+    const audioBytes = Buffer.from(audioContent).toString("base64");
+
+    const [response] = await googleSpeechClient.recognize({
+      audio: { content: audioBytes },
+      config: {
+        encoding: "OGG_OPUS",
+        sampleRateHertz: 48000,
+        languageCode: "en-US",
+        enableAutomaticPunctuation: true,
+      },
+    });
+
+    const transcription = response.results
+      ?.map((result) => result.alternatives?.[0]?.transcript)
+      .filter(Boolean)
+      .join(" ");
+
+    return transcription || null;
+  } catch (error) {
+    console.error("Google transcription failed:", error);
+    return null;
+  }
+}
+
+/**
+ * Transcribe audio using OpenAI Whisper.
+ */
+async function transcribeWithOpenAI(filePath: string): Promise<string | null> {
   if (!openaiClient) {
     console.warn("OpenAI client not available for transcription");
     return null;
@@ -164,9 +214,65 @@ export async function transcribeVoice(
     });
     return transcript.text;
   } catch (error) {
-    console.error("Transcription failed:", error);
+    console.error("OpenAI transcription failed:", error);
     return null;
   }
+}
+
+/**
+ * Transcribe voice message using configured provider.
+ * Default: Google Cloud Speech-to-Text
+ * Fallback: OpenAI Whisper (if Google fails or not configured)
+ */
+export async function transcribeVoice(
+  filePath: string
+): Promise<string | null> {
+  // Try primary provider first
+  if (TRANSCRIPTION_PROVIDER === "google" && googleSpeechClient) {
+    console.log("Using Google Speech-to-Text");
+    const result = await transcribeWithGoogle(filePath);
+    if (result) {
+      console.log("Google transcription successful");
+      return result;
+    }
+
+    // Fall back to OpenAI if Google fails
+    if (openaiClient) {
+      console.log("Google transcription failed, falling back to OpenAI Whisper");
+      const fallbackResult = await transcribeWithOpenAI(filePath);
+      if (fallbackResult) console.log("OpenAI fallback successful");
+      return fallbackResult;
+    }
+    return null;
+  }
+
+  // OpenAI as primary
+  if (TRANSCRIPTION_PROVIDER === "openai" && openaiClient) {
+    console.log("Using OpenAI Whisper");
+    const result = await transcribeWithOpenAI(filePath);
+    if (result) {
+      console.log("OpenAI transcription successful");
+      return result;
+    }
+
+    // Fall back to Google if OpenAI fails
+    if (googleSpeechClient) {
+      console.log("OpenAI transcription failed, falling back to Google");
+      return transcribeWithGoogle(filePath);
+    }
+    return null;
+  }
+
+  // Try whatever is available
+  if (googleSpeechClient) {
+    return transcribeWithGoogle(filePath);
+  }
+  if (openaiClient) {
+    return transcribeWithOpenAI(filePath);
+  }
+
+  console.warn("No transcription client available");
+  return null;
 }
 
 // ============== Typing Indicator ==============
