@@ -150,6 +150,14 @@ export const QUERY_TIMEOUT_MS = 180_000;
 
 // ============== Voice Transcription ==============
 
+// Provider: "google" (default) or "openai"
+export const TRANSCRIPTION_PROVIDER =
+  process.env.TRANSCRIPTION_PROVIDER || "google";
+
+// Google Cloud credentials path
+export const GOOGLE_APPLICATION_CREDENTIALS =
+  process.env.GOOGLE_APPLICATION_CREDENTIALS || "";
+
 const BASE_TRANSCRIPTION_PROMPT = `Transcribe this voice message accurately.
 The speaker may use multiple languages (English, and possibly others).
 Focus on accuracy for proper nouns, technical terms, and commands.`;
@@ -160,7 +168,9 @@ export const TRANSCRIPTION_PROMPT = TRANSCRIPTION_CONTEXT
   ? `${BASE_TRANSCRIPTION_PROMPT}\n\nAdditional context:\n${TRANSCRIPTION_CONTEXT}`
   : BASE_TRANSCRIPTION_PROMPT;
 
-export const TRANSCRIPTION_AVAILABLE = !!OPENAI_API_KEY;
+// Transcription is available if Google credentials exist OR OpenAI key exists
+export const TRANSCRIPTION_AVAILABLE =
+  !!GOOGLE_APPLICATION_CREDENTIALS || !!OPENAI_API_KEY;
 
 // ============== Thinking Keywords ==============
 

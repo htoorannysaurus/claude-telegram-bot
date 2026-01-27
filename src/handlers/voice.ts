@@ -37,7 +37,7 @@ export async function handleVoice(ctx: Context): Promise<void> {
   // 2. Check if transcription is available
   if (!TRANSCRIPTION_AVAILABLE) {
     await ctx.reply(
-      "Voice transcription is not configured. Set OPENAI_API_KEY in .env"
+      "Voice transcription is not configured. Set GOOGLE_APPLICATION_CREDENTIALS or OPENAI_API_KEY in .env"
     );
     return;
   }
