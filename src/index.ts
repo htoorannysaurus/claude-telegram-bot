@@ -22,7 +22,6 @@ import {
   handleDocument,
   handleCallback,
 } from "./handlers";
-import { startHeartbeat, stopHeartbeat } from "./heartbeat";
 
 // Create bot instance
 const bot = new Bot(TELEGRAM_TOKEN);
@@ -119,12 +118,8 @@ if (existsSync(RESTART_FILE)) {
 // Start with concurrent runner (commands work immediately)
 const runner = run(bot);
 
-// Start heartbeat timer
-startHeartbeat();
-
 // Graceful shutdown
 const stopRunner = () => {
-  stopHeartbeat();
   if (runner.isRunning()) {
     console.log("Stopping bot...");
     runner.stop();

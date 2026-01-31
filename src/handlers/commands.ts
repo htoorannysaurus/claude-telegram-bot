@@ -8,7 +8,6 @@ import type { Context } from "grammy";
 import { session } from "../session";
 import { WORKING_DIR, ALLOWED_USERS, RESTART_FILE } from "../config";
 import { isAuthorized } from "../security";
-import { getHeartbeatStatus } from "../heartbeat";
 
 /**
  * /start - Show welcome message and status.
@@ -162,9 +161,6 @@ export async function handleStatus(ctx: Context): Promise<void> {
 
   // Working directory
   lines.push(`\n📁 Working dir: <code>${WORKING_DIR}</code>`);
-
-  // Heartbeat status
-  lines.push(`\n💓 ${getHeartbeatStatus()}`);
 
   await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
 }
