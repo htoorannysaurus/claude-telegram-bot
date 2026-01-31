@@ -207,6 +207,22 @@ export const RATE_LIMIT_WINDOW = parseInt(
   10
 );
 
+// ============== Heartbeat Configuration ==============
+
+// Enable/disable heartbeat (default: disabled)
+export const HEARTBEAT_ENABLED =
+  (process.env.HEARTBEAT_ENABLED || "false").toLowerCase() === "true";
+
+// Heartbeat interval in milliseconds (default: 30 minutes)
+export const HEARTBEAT_INTERVAL_MS = parseInt(
+  process.env.HEARTBEAT_INTERVAL_MS || String(30 * 60 * 1000),
+  10
+);
+
+// Prompt sent for heartbeat (Claude can respond or just acknowledge)
+export const HEARTBEAT_PROMPT =
+  process.env.HEARTBEAT_PROMPT || "HEARTBEAT";
+
 // ============== File Paths ==============
 
 export const SESSION_FILE = "/tmp/claude-telegram-session.json";
