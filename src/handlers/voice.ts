@@ -12,6 +12,8 @@ import {
   auditLogRateLimit,
   transcribeVoice,
   startTypingIndicator,
+  isTtsEnabled,
+  sendTtsVoiceNote,
 } from "../utils";
 import { StreamingState, createStatusCallback } from "./streaming";
 
@@ -115,7 +117,12 @@ export async function handleVoice(ctx: Context): Promise<void> {
       ctx
     );
 
-    // 12. Audit log
+    // 12. Send TTS voice note if enabled
+    if (isTtsEnabled() && claudeResponse) {
+      await sendTtsVoiceNote(ctx, claudeResponse);
+    }
+
+    // 13. Audit log
     await auditLog(userId, username, "VOICE", transcript, claudeResponse);
   } catch (error) {
     console.error("Error processing voice:", error);

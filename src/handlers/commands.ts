@@ -8,6 +8,7 @@ import type { Context } from "grammy";
 import { session } from "../session";
 import { WORKING_DIR, ALLOWED_USERS, RESTART_FILE } from "../config";
 import { isAuthorized } from "../security";
+import { isTtsEnabled, setTtsEnabled } from "../utils";
 
 /**
  * /start - Show welcome message and status.
@@ -34,6 +35,7 @@ export async function handleStart(ctx: Context): Promise<void> {
       `/status - Show detailed status\n` +
       `/resume - Resume last session\n` +
       `/retry - Retry last message\n` +
+      `/tts - Toggle voice notes for responses\n` +
       `/restart - Restart the bot\n\n` +
       `<b>Tips:</b>\n` +
       `• Prefix with <code>!</code> to interrupt current query\n` +
@@ -299,4 +301,25 @@ export async function handleRetry(ctx: Context): Promise<void> {
   } as Context;
 
   await handleText(fakeCtx);
+}
+
+/**
+ * /tts - Toggle text-to-speech voice notes for responses.
+ */
+export async function handleTts(ctx: Context): Promise<void> {
+  const userId = ctx.from?.id;
+
+  if (!isAuthorized(userId, ALLOWED_USERS)) {
+    await ctx.reply("Unauthorized.");
+    return;
+  }
+
+  const newState = !isTtsEnabled();
+  setTtsEnabled(newState);
+
+  if (newState) {
+    await ctx.reply("🔊 TTS enabled. Responses will include a voice note.");
+  } else {
+    await ctx.reply("🔇 TTS disabled.");
+  }
 }

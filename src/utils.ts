@@ -6,8 +6,10 @@
 
 import OpenAI from "openai";
 import { SpeechClient } from "@google-cloud/speech";
+import { TextToSpeechClient } from "@google-cloud/text-to-speech";
 import type { Chat } from "grammy/types";
 import type { Context } from "grammy";
+import { InputFile } from "grammy";
 import type { AuditEvent } from "./types";
 import {
   AUDIT_LOG_PATH,
@@ -17,6 +19,7 @@ import {
   TRANSCRIPTION_AVAILABLE,
   TRANSCRIPTION_PROVIDER,
   GOOGLE_APPLICATION_CREDENTIALS,
+  TEMP_DIR,
 } from "./config";
 
 // ============== OpenAI Client ==============
@@ -34,6 +37,28 @@ if (GOOGLE_APPLICATION_CREDENTIALS) {
     keyFilename: GOOGLE_APPLICATION_CREDENTIALS,
   });
   console.log("Google Speech-to-Text client initialized");
+}
+
+// ============== Google TTS Client ==============
+
+let googleTtsClient: TextToSpeechClient | null = null;
+if (GOOGLE_APPLICATION_CREDENTIALS) {
+  googleTtsClient = new TextToSpeechClient({
+    keyFilename: GOOGLE_APPLICATION_CREDENTIALS,
+  });
+  console.log("Google Text-to-Speech client initialized");
+}
+
+// ============== TTS Toggle State ==============
+
+let ttsEnabled = false;
+
+export function isTtsEnabled(): boolean {
+  return ttsEnabled;
+}
+
+export function setTtsEnabled(enabled: boolean): void {
+  ttsEnabled = enabled;
 }
 
 // ============== Audit Logging ==============
@@ -273,6 +298,80 @@ export async function transcribeVoice(
 
   console.warn("No transcription client available");
   return null;
+}
+
+// ============== Text-to-Speech ==============
+
+/**
+ * Convert text to speech using Google Cloud TTS and send as Telegram voice note.
+ * Strips markdown/HTML formatting before synthesis.
+ * Max 5000 chars per request (Google limit).
+ */
+export async function sendTtsVoiceNote(
+  ctx: Context,
+  text: string
+): Promise<void> {
+  if (!googleTtsClient) {
+    console.warn("Google TTS client not available");
+    return;
+  }
+
+  try {
+    // Strip markdown/HTML formatting for cleaner speech
+    let cleanText = text
+      .replace(/<[^>]+>/g, "") // HTML tags
+      .replace(/```[\s\S]*?```/g, "(code block omitted)") // code blocks
+      .replace(/`[^`]+`/g, (match) => match.slice(1, -1)) // inline code
+      .replace(/\*\*([^*]+)\*\*/g, "$1") // bold
+      .replace(/\*([^*]+)\*/g, "$1") // italic
+      .replace(/__([^_]+)__/g, "$1") // bold alt
+      .replace(/_([^_]+)_/g, "$1") // italic alt
+      .replace(/#{1,6}\s*/g, "") // headers
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // links
+      .replace(/^\s*[-*+]\s+/gm, "") // list bullets
+      .replace(/^\s*\d+\.\s+/gm, "") // numbered lists
+      .trim();
+
+    // Google TTS limit is 5000 bytes; truncate if needed
+    if (cleanText.length > 4500) {
+      cleanText = cleanText.slice(0, 4500) + "...";
+    }
+
+    if (!cleanText) return;
+
+    const [response] = await googleTtsClient.synthesizeSpeech({
+      input: { text: cleanText },
+      voice: {
+        languageCode: "en-US",
+        name: "en-US-Journey-D", // Natural male voice
+        ssmlGender: "MALE",
+      },
+      audioConfig: {
+        audioEncoding: "OGG_OPUS",
+        sampleRateHertz: 48000,
+        speakingRate: 1.0,
+      },
+    });
+
+    if (response.audioContent) {
+      const audioBuffer = Buffer.from(response.audioContent as Uint8Array);
+      const audioPath = `${TEMP_DIR}/tts_${Date.now()}.ogg`;
+      await Bun.write(audioPath, audioBuffer);
+
+      // Send as voice note (round bubble in Telegram)
+      await ctx.replyWithVoice(new InputFile(audioPath));
+
+      // Clean up
+      try {
+        const { unlinkSync } = await import("fs");
+        unlinkSync(audioPath);
+      } catch {
+        // ignore cleanup errors
+      }
+    }
+  } catch (error) {
+    console.error("TTS failed:", error);
+  }
 }
 
 // ============== Typing Indicator ==============

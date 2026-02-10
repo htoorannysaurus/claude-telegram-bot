@@ -11,6 +11,8 @@ import {
   auditLogRateLimit,
   checkInterrupt,
   startTypingIndicator,
+  isTtsEnabled,
+  sendTtsVoiceNote,
 } from "../utils";
 import { StreamingState, createStatusCallback } from "./streaming";
 
@@ -84,7 +86,12 @@ export async function handleText(ctx: Context): Promise<void> {
         ctx
       );
 
-      // 10. Audit log
+      // 10. Send TTS voice note if enabled
+      if (isTtsEnabled() && response) {
+        await sendTtsVoiceNote(ctx, response);
+      }
+
+      // 11. Audit log
       await auditLog(userId, username, "TEXT", message, response);
       break; // Success - exit retry loop
     } catch (error) {
